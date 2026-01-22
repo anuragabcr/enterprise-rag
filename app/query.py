@@ -4,7 +4,8 @@ import requests
 
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
-from langchain.prompts import PromptTemplate
+from langchain_openai import ChatOpenAI
+from langchain.schema import HumanMessage
 from app.prompt import ENTERPRISE_QA_PROMPT
 
 # Load environment variables
@@ -52,6 +53,24 @@ def call_gemma(prompt: str) -> str:
 
     return data["choices"][0]["message"]["content"]
 
+def call_gemma_langchain(prompt: str) -> str:
+    llm = ChatOpenAI(
+        model="google/gemma-3-27b-it:free",
+        temperature=0,
+        openai_api_key=os.getenv("OPENROUTER_API_KEY"),
+        openai_api_base="https://openrouter.ai/api/v1",
+        default_headers={
+            "HTTP-Referer": "http://localhost:8000",
+            "X-Title": "Enterprise RAG Demo",
+        },
+        openai_proxy=""
+    )
+
+    response = llm.invoke([
+        HumanMessage(content=prompt)
+    ])
+    return response.content
+
 def answer_question(question: str) -> str:
     vectorstore = load_vectorstore()
     docs = vectorstore.similarity_search(question, k=4)
@@ -64,6 +83,7 @@ def answer_question(question: str) -> str:
     )
 
     return call_gemma(final_prompt)
+    # return call_gemma_langchain(final_prompt)
 
 if __name__ == "__main__":
     question = input("Ask a question: ")
