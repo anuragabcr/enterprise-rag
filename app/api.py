@@ -3,6 +3,7 @@ from typing import List
 import shutil
 import os
 from pydantic import BaseModel
+from app.cache import redis_client
 
 from app.ingest import ingest_documents
 from app.query import answer_question
@@ -39,6 +40,7 @@ def upload_docs(files: List[UploadFile] = File(...)):
             shutil.copyfileobj(file.file, buffer)
 
     ingest_documents()
+    redis_client.flushdb()
 
     return {
         "message": "Documents uploaded and indexed successfully",

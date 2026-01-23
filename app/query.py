@@ -2,6 +2,9 @@ from dotenv import load_dotenv
 import os
 import requests
 
+import hashlib
+from app.cache import redis_client
+
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_openai import ChatOpenAI
@@ -71,7 +74,17 @@ def call_gemma_langchain(prompt: str) -> str:
     ])
     return response.content
 
+def get_cache_key(question: str) -> str:
+    question_hash = hashlib.sha256(question.encode()).hexdigest()
+    return f"rag_answer:{question_hash}"
+
 def answer_question(question: str) -> str:
+    cache_key = get_cache_key(question)
+
+    cached_answer = redis_client.get(cache_key)
+    if cached_answer:
+        return cached_answer 
+    
     vectorstore = load_vectorstore()
     docs = vectorstore.similarity_search(question, k=4)
 
@@ -82,8 +95,16 @@ def answer_question(question: str) -> str:
         question=question
     )
 
-    return call_gemma(final_prompt)
-    # return call_gemma_langchain(final_prompt)
+    answer = call_gemma(final_prompt)
+    # answer = call_gemma_langchain(final_prompt)
+
+    redis_client.setex(
+        cache_key,
+        3600,
+        answer
+    )
+
+    return answer
 
 if __name__ == "__main__":
     question = input("Ask a question: ")
