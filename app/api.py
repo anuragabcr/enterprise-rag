@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from app.cache import redis_client
 
 from app.ingest import ingest_documents
-from app.query import answer_question
+from app.query import answer_question, answer_question_conv
 
 DATA_DIR = "data/documents"
 
@@ -18,6 +18,7 @@ app = FastAPI(
 
 class QuestionRequest(BaseModel):
     question: str
+    conversation_id: str
 
 @app.get("/")
 def health():
@@ -49,9 +50,14 @@ def upload_docs(files: List[UploadFile] = File(...)):
 
 @app.post("/ask-question")
 def ask_question(request: QuestionRequest):
-    answer = answer_question(request.question)
+    # answer = answer_question(request.question)
+    answer = answer_question_conv(
+        request.question,
+        request.conversation_id
+    )
 
     return {
+        "conversation_id": request.conversation_id,
         "question": request.question,
         "answer": answer
     }

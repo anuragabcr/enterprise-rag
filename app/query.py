@@ -3,13 +3,13 @@ import os
 import requests
 
 import hashlib
-from app.cache import redis_client
+from app.cache import redis_client, get_conversation, save_conversation
 
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_openai import ChatOpenAI
 from langchain.schema import HumanMessage
-from app.prompt import ENTERPRISE_QA_PROMPT
+from app.prompt import ENTERPRISE_QA_PROMPT, CONVERSATIONAL_RAG_PROMPT
 
 # Load environment variables
 load_dotenv()
@@ -55,6 +55,14 @@ def call_gemma(prompt: str) -> str:
     data = response.json()
 
     return data["choices"][0]["message"]["content"]
+
+def format_history(messages: list, max_turns: int = 5) -> str:
+    recent = messages[-(max_turns * 2):]
+    return "\n".join(
+        f"{m['role'].capitalize()}: {m['content']}"
+        for m in recent
+    )
+
 
 def call_gemma_langchain(prompt: str) -> str:
     llm = ChatOpenAI(
@@ -103,6 +111,31 @@ def answer_question(question: str) -> str:
         3600,
         answer
     )
+
+    return answer
+
+def answer_question_conv(question: str, conversation_id: str) -> str:
+    history_messages = get_conversation(conversation_id)
+    history_text = format_history(history_messages)
+
+    vectorstore = load_vectorstore()
+    docs = vectorstore.similarity_search(question, k=4)
+    context = "\n\n".join(doc.page_content for doc in docs)
+
+    final_prompt = CONVERSATIONAL_RAG_PROMPT.format(
+        history=history_text,
+        context=context,
+        question=question
+    )
+
+    answer = call_gemma(final_prompt)
+
+    history_messages.extend([
+        {"role": "user", "content": question},
+        {"role": "assistant", "content": answer}
+    ])
+
+    save_conversation(conversation_id, history_messages)
 
     return answer
 

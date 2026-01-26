@@ -1,10 +1,14 @@
 import streamlit as st
 import requests
+import uuid
 
 # ---------------------------
 # Config
 # ---------------------------
 API_BASE_URL = "http://127.0.0.1:8000"
+
+if "conversation_id" not in st.session_state:
+    st.session_state.conversation_id = str(uuid.uuid4())
 
 st.set_page_config(
     page_title="Enterprise Document Q&A",
@@ -70,7 +74,10 @@ if st.button("Get Answer"):
         with st.spinner("Searching documents and generating answer..."):
             response = requests.post(
                 f"{API_BASE_URL}/ask-question",
-                json={"question": question}
+                json={
+                    "question": question,
+                    "conversation_id": st.session_state.conversation_id
+                }
             )
 
         if response.status_code == 200:

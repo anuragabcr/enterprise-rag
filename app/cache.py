@@ -1,5 +1,6 @@
 import redis
 import os
+import json
 
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
@@ -11,3 +12,14 @@ redis_client = redis.Redis(
     db=REDIS_DB,
     decode_responses=True
 )
+
+def get_conversation(conversation_id: str):
+    data = redis_client.get(f"conversation:{conversation_id}")
+    return json.loads(data) if data else []
+
+def save_conversation(conversation_id: str, messages: list):
+    redis_client.set(
+        f"conversation:{conversation_id}",
+        json.dumps(messages),
+        ex=3600 
+    )
